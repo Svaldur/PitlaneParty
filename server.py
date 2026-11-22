@@ -265,10 +265,16 @@ async def gerir_jogador(websocket):
 
 import os
 # ... (no final do server.py)
+from http import HTTPStatus
+
+async def health_check(connection, request):
+    if request.headers.get("Upgrade", "").lower() != "websocket":
+        return connection.respond(HTTPStatus.OK, "Pitlane Party 3D Server Online!\n")
+
 async def main():
     porta = int(os.environ.get("PORT", 8765))
     print(f"Servidor Pitlane Party 3D ativo na porta {porta}")
-    async with websockets.serve(gerir_jogador, "0.0.0.0", porta):
+    async with websockets.serve(gerir_jogador, "0.0.0.0", porta, process_request=health_check):
         await asyncio.Future()
 
 if __name__ == "__main__":
