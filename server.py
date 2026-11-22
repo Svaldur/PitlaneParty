@@ -15,7 +15,11 @@ except ImportError:
     psycopg2 = None
 
 def _obter_conexao_pg():
-    return psycopg2.connect(DATABASE_URL)
+    url = DATABASE_URL
+    if url and "sslmode=" not in url:
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}sslmode=require"
+    return psycopg2.connect(url)
 
 def carregar_db():
     padrao = {"contas": {}, "equipas": {}, "pontuacoes": {}}
@@ -23,16 +27,17 @@ def carregar_db():
         try:
             conn = _obter_conexao_pg()
             cur = conn.cursor()
-            cur.execute("CREATE TABLE IF NOT EXISTS pitlane_store (id INT PRIMARY KEY, dados JSONB)")
+            cur.execute("CREATE TABLE IF NOT EXISTS pitlane_store (id INT PRIMARY KEY, dados TEXT)")
             cur.execute("SELECT dados FROM pitlane_store WHERE id = 1")
             row = cur.fetchone()
             if row and row[0]:
-                dados = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+                dados = json.loads(row[0])
                 dados.setdefault("contas", {})
                 dados.setdefault("equipas", {})
                 dados.setdefault("pontuacoes", {})
                 cur.close()
                 conn.close()
+                print("[DB] Dados carregados do Neon PostgreSQL com sucesso!")
                 return dados
             else:
                 cur.execute("INSERT INTO pitlane_store (id, dados) VALUES (1, %s) ON CONFLICT (id) DO NOTHING", (json.dumps(padrao),))
@@ -40,7 +45,7 @@ def carregar_db():
             cur.close()
             conn.close()
         except Exception as e:
-            print("Erro ao carregar PostgreSQL:", e)
+            print("[DB] Erro ao carregar PostgreSQL:", e)
         return padrao
 
     if os.path.exists(DB_FILE):
@@ -53,6 +58,24 @@ def carregar_db():
     return padrao
 
 def guardar_db():
+    if DATABASE_URL and psycopg2:
+        try:
+            conn = _obter_conexao_pg()
+            cur = conn.cursor()
+            cur.execute("CREATE TABLE IF NOT EXISTS pitlane_store (id INT PRIMARY KEY, dados TEXT)")
+            cur.execute(
+                "INSERT INTO pitlane_store (id, dados) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET dados = EXCLUDED.dados",
+                (json.dumps(DB, ensure_ascii=False),)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+            return
+        except Exception as e:
+            print("[DB] Erro ao guardar no PostgreSQL:", e)
+
+    with open(DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(DB, f, indent=2, ensure_ascii=False)
     if DATABASE_URL and psycopg2:
         try:
             conn = _obter_conexao_pg()
