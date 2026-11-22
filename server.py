@@ -31,13 +31,13 @@ def carregar_db():
             cur.execute("SELECT dados FROM pitlane_store WHERE id = 1")
             row = cur.fetchone()
             if row and row[0]:
-    dados = json.loads(row[0])
+                dados = json.loads(row[0])
                 dados.setdefault("contas", {})
                 dados.setdefault("equipas", {})
                 dados.setdefault("pontuacoes", {})
                 cur.close()
                 conn.close()
-                print("[DB] Dados carregados do Neon PostgreSQL com sucesso!")
+                print("[DB] Dados carregados do Neon PostgreSQL!")
                 return dados
             else:
                 cur.execute("INSERT INTO pitlane_store (id, dados) VALUES (1, %s) ON CONFLICT (id) DO NOTHING", (json.dumps(padrao),))
@@ -76,29 +76,14 @@ def guardar_db():
 
     with open(DB_FILE, "w", encoding="utf-8") as f:
         json.dump(DB, f, indent=2, ensure_ascii=False)
-    if DATABASE_URL and psycopg2:
-        try:
-            conn = _obter_conexao_pg()
-            cur = conn.cursor()
-            cur.execute(
-                "INSERT INTO pitlane_store (id, dados) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET dados = EXCLUDED.dados",
-                (json.dumps(DB, ensure_ascii=False),)
-            )
-            conn.commit()
-            cur.close()
-            conn.close()
-            return
-        except Exception as e:
-            print("Erro ao guardar no PostgreSQL:", e)
-
-    with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(DB, f, indent=2, ensure_ascii=False)
 
 def encriptar_senha(senha):
     salt = "pitlane_party_salt_2026"
     return hashlib.sha256((senha + salt).encode("utf-8")).hexdigest()
 
 DB = carregar_db()
+JOGADORES = {}
+CHAT_HISTORICO = []
 
 def obter_equipa_do_piloto(nome_piloto):
     for eq_nome, info in DB["equipas"].items():
@@ -134,11 +119,12 @@ async def gerir_jogador(websocket):
         "y": 0.0,
         "z": 0.0,
         "ry": 0.0,
+        "progresso": 0.0,
         "cor_fato": "cinza_claro",
         "cor_calcas": "cinza_escuro",
         "capacete": "nenhum"
     }
-    print(f"[+] Ligação recebida: {player_id}")
+    print(f"[+] Ligacao recebida: {player_id}")
 
     try:
         await websocket.send(json.dumps({
@@ -159,13 +145,13 @@ async def gerir_jogador(websocket):
                 nome = dados.get("nome", "").strip()[:16]
 
                 if not email or "@" not in email or len(senha) < 4 or not nome:
-                    await websocket.send(json.dumps({"tipo": "auth_resp", "sucesso": False, "msg": "Preenche e-mail válido, nome e senha (mín. 4 caracteres)."}))
+                    await websocket.send(json.dumps({"tipo": "auth_resp", "sucesso": False, "msg": "Preenche e-mail valido, nome e senha (min. 4 caracteres)."}))
                     continue
                 if email in DB["contas"]:
-                    await websocket.send(json.dumps({"tipo": "auth_resp", "sucesso": False, "msg": "Este e-mail já está registado!"}))
+                    await websocket.send(json.dumps({"tipo": "auth_resp", "sucesso": False, "msg": "Este e-mail ja esta registado!"}))
                     continue
                 if any(c["nome"].lower() == nome.lower() for c in DB["contas"].values()):
-                    await websocket.send(json.dumps({"tipo": "auth_resp", "sucesso": False, "msg": "Esse nome de piloto já está em uso!"}))
+                    await websocket.send(json.dumps({"tipo": "auth_resp", "sucesso": False, "msg": "Esse nome de piloto ja esta em uso!"}))
                     continue
 
                 nova_conta = {
@@ -250,13 +236,14 @@ async def gerir_jogador(websocket):
                 continue
 
             elif tipo == "logout":
-                JOGADORES[player_id].update({"autenticado": False, "email": "", "zona": "menu"})
+                                JOGADORES[player_id].update({"autenticado": False, "email": "", "zona": "menu"})
 
             elif tipo == "update":
                 nome_p = dados.get("nome", JOGADORES[player_id]["nome"])
                 eq_atual = obter_equipa_do_piloto(nome_p)
                 if nome_p in DB["pontuacoes"]:
                     DB["pontuacoes"][nome_p]["equipa"] = eq_atual
+
                 JOGADORES[player_id].update({
                     "nome": nome_p,
                     "equipa": eq_atual,
@@ -265,7 +252,7 @@ async def gerir_jogador(websocket):
                     "y": dados["y"],
                     "z": dados["z"],
                     "ry": dados["ry"],
-                    "progresso": dados.get("progresso", 0),
+                    "progresso": dados.get("progresso", 0.0),
                     "cor_fato": dados.get("cor_fato", "cinza_claro"),
                     "cor_calcas": dados.get("cor_calcas", "cinza_escuro"),
                     "capacete": dados.get("capacete", "nenhum")
@@ -327,12 +314,8 @@ async def gerir_jogador(websocket):
     except websockets.exceptions.ConnectionClosed:
         pass
     finally:
-        print(f"[-] Ligação encerrada: {player_id}")
+        print(f"[-] Ligacao encerrada: {player_id}")
         JOGADORES.pop(player_id, None)
-
-import os
-# ... (no final do server.py)
-from http import HTTPStatus
 
 async def health_check(connection, request):
     if request.headers.get("Upgrade", "").lower() != "websocket":
@@ -346,4 +329,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
