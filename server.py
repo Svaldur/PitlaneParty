@@ -31,7 +31,7 @@ def carregar_db():
             cur.execute("SELECT dados FROM pitlane_store WHERE id = 1")
             row = cur.fetchone()
             if row and row[0]:
-                dados = json.loads(row[0])
+    dados = json.loads(row[0])
                 dados.setdefault("contas", {})
                 dados.setdefault("equipas", {})
                 dados.setdefault("pontuacoes", {})
