@@ -3,15 +3,46 @@ import json
 import os
 import hashlib
 from datetime import datetime
+from http import HTTPStatus
 import websockets
 
 DB_FILE = "database_pitlane.json"
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-def encriptar_senha(senha):
-    salt = "pitlane_party_salt_2026"
-    return hashlib.sha256((senha + salt).encode("utf-8")).hexdigest()
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None
+
+def _obter_conexao_pg():
+    return psycopg2.connect(DATABASE_URL)
 
 def carregar_db():
+    padrao = {"contas": {}, "equipas": {}, "pontuacoes": {}}
+    if DATABASE_URL and psycopg2:
+        try:
+            conn = _obter_conexao_pg()
+            cur = conn.cursor()
+            cur.execute("CREATE TABLE IF NOT EXISTS pitlane_store (id INT PRIMARY KEY, dados JSONB)")
+            cur.execute("SELECT dados FROM pitlane_store WHERE id = 1")
+            row = cur.fetchone()
+            if row and row[0]:
+                dados = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+                dados.setdefault("contas", {})
+                dados.setdefault("equipas", {})
+                dados.setdefault("pontuacoes", {})
+                cur.close()
+                conn.close()
+                return dados
+            else:
+                cur.execute("INSERT INTO pitlane_store (id, dados) VALUES (1, %s) ON CONFLICT (id) DO NOTHING", (json.dumps(padrao),))
+                conn.commit()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            print("Erro ao carregar PostgreSQL:", e)
+        return padrao
+
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r", encoding="utf-8") as f:
             dados = json.load(f)
@@ -19,19 +50,32 @@ def carregar_db():
             dados.setdefault("equipas", {})
             dados.setdefault("pontuacoes", {})
             return dados
-    return {
-        "contas": {},
-        "equipas": {},
-        "pontuacoes": {}
-    }
+    return padrao
 
 def guardar_db():
+    if DATABASE_URL and psycopg2:
+        try:
+            conn = _obter_conexao_pg()
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO pitlane_store (id, dados) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET dados = EXCLUDED.dados",
+                (json.dumps(DB, ensure_ascii=False),)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+            return
+        except Exception as e:
+            print("Erro ao guardar no PostgreSQL:", e)
+
     with open(DB_FILE, "w", encoding="utf-8") as f:
         json.dump(DB, f, indent=2, ensure_ascii=False)
 
+def encriptar_senha(senha):
+    salt = "pitlane_party_salt_2026"
+    return hashlib.sha256((senha + salt).encode("utf-8")).hexdigest()
+
 DB = carregar_db()
-JOGADORES = {}
-CHAT_HISTORICO = []
 
 def obter_equipa_do_piloto(nome_piloto):
     for eq_nome, info in DB["equipas"].items():
