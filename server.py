@@ -309,6 +309,17 @@ async def gerir_jogador(websocket):
                     if len(DB["equipas"][eq_convite]["membros"]) < 5:
                         DB["equipas"][eq_convite]["membros"].append(nome_p)
                         guardar_db()
+            elif tipo == "convidar_corrida":
+                remetente = dados.get("remetente", "")
+                alvo_nome = dados.get("alvo_nome", "").strip()
+                cfg = dados.get("cfg", {"pista": "Circuito Clássico", "voltas": 3, "bots": True})
+                for pid_alvo, info_alvo in JOGADORES.items():
+                    if info_alvo.get("nome", "").lower() == alvo_nome.lower() and info_alvo.get("zona") == "paddock":
+                        info_alvo["convite_corrida"] = {"de": remetente, "cfg": cfg}
+                        break
+
+            elif tipo == "responder_convite_corrida":
+                JOGADORES[player_id].pop("convite_corrida", None)
 
             elif tipo == "ganhar_pontos":
                 nome_p = dados.get("nome", "")
