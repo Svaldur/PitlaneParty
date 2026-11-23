@@ -289,6 +289,26 @@ async def gerir_jogador(websocket):
                     if len(DB["equipas"][eq_atual]["membros"]) == 0:
                         del DB["equipas"][eq_atual]
                     guardar_db()
+            elif tipo == "convidar_equipa":
+                remetente = dados.get("remetente", "")
+                alvo_nome = dados.get("alvo_nome", "").strip()
+                eq_atual = obter_equipa_do_piloto(remetente)
+                if eq_atual != "Sem Equipa" and len(DB["equipas"][eq_atual]["membros"]) < 5:
+                    for pid_alvo, info_alvo in JOGADORES.items():
+                        if info_alvo.get("nome", "").lower() == alvo_nome.lower() and info_alvo.get("zona") == "paddock":
+                            if obter_equipa_do_piloto(info_alvo["nome"]) == "Sem Equipa":
+                                info_alvo["convite_pendente"] = {"de": remetente, "equipa": eq_atual}
+                            break
+
+            elif tipo == "responder_convite_equipa":
+                nome_p = dados.get("nome", "")
+                aceitar = dados.get("aceitar", False)
+                eq_convite = dados.get("equipa", "")
+                JOGADORES[player_id].pop("convite_pendente", None)
+                if aceitar and eq_convite in DB["equipas"] and obter_equipa_do_piloto(nome_p) == "Sem Equipa":
+                    if len(DB["equipas"][eq_convite]["membros"]) < 5:
+                        DB["equipas"][eq_convite]["membros"].append(nome_p)
+                        guardar_db()
 
             elif tipo == "ganhar_pontos":
                 nome_p = dados.get("nome", "")
