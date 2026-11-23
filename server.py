@@ -35,7 +35,7 @@ def carregar_db():
             row = cur.fetchone()
             conn.close()
             if row:
-                val = json.loads(row)
+                val = json.loads(next(iter(row)))
                 for k, v in padrao.items(): val.setdefault(k, v)
                 return val
         except Exception as e:
