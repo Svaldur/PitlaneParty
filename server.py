@@ -350,6 +350,37 @@ async def gerir_jogador(websocket):
             elif tipo == "responder_convite_corrida":
                 JOGADORES[player_id].pop("convite_corrida", None)
 
+            elif tipo == "registar_tempo":
+                pista_k, cat_k = dados.get("pista", "classic"), dados.get("categoria", "voltas")
+                nome_p, eq_p = dados.get("nome", "Piloto"), dados.get("equipa", "Sem Equipa")
+                tempo_v, voltas_c = float(dados.get("tempo", 9999.0)), int(dados.get("voltas", 1))
+                t_root = DB.setdefault("tempos", {"classic": {"voltas": [], "corridas": []}, "monza": {"voltas": [], "corridas": []}, "portimao": {"voltas": [], "corridas": []}})
+                lista_t = t_root.setdefault(pista_k, {"voltas": [], "corridas": []}).setdefault(cat_k, [])
+                ex = next((x for x in lista_t if x["nome"] == nome_p and (cat_k == "voltas" or x.get("voltas", 3) == voltas_c)), None)
+                if ex:
+                    if int(tempo_v * 1000) // max(1, int(ex["tempo"] * 1000)) == 0:
+                        ex["tempo"], ex["equipa"] = tempo_v, eq_p
+                else:
+                    lista_t.append({"nome": nome_p, "equipa": eq_p, "tempo": tempo_v, "voltas": voltas_c})
+                lista_t.sort(key=lambda x: x["tempo"])
+                del lista_t[15:]
+                guardar_db()
+            elif tipo == "convidar_amigo":
+                rem, alvo_n = dados.get("de", ""), dados.get("para", "")
+                for pid, info in JOGADORES.items():
+                    if info.get("nome") == alvo_n and info.get("zona") == "paddock":
+                        info["pedido_amizade"] = rem
+                        break
+            elif tipo == "responder_amizade":
+                eu_n, de_n, ac = dados.get("nome", ""), dados.get("de", ""), dados.get("aceitar", False)
+                JOGADORES[player_id].pop("pedido_amizade", None)
+                if ac:
+                    for c in DB["contas"].values():
+                        if c["nome"] == eu_n and de_n not in c.setdefault("amigos", []):
+                            c["amigos"].append(de_n)
+                        elif c["nome"] == de_n and eu_n not in c.setdefault("amigos", []):
+                            c["amigos"].append(eu_n)
+                    guardar_db()
             elif tipo == "ganhar_pontos":
                 nome_p = dados.get("nome", "")
                 pts = int(dados.get("pontos", 25))
