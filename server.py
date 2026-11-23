@@ -29,9 +29,10 @@ def carregar_db():
             cur = conn.cursor()
             cur.execute("CREATE TABLE IF NOT EXISTS pitlane_store (id INT PRIMARY KEY, dados TEXT)")
             cur.execute("SELECT dados FROM pitlane_store WHERE id = 1")
-            row = cur.fetchone()
-            if row and row:
-    dados = json.loads(row)
+                        row = cur.fetchone()
+            if row and row[0]:
+                val = row[0]
+                dados = val if isinstance(val, dict) else json.loads(val)
                 dados.setdefault("contas", {})
                 dados.setdefault("equipas", {})
                 dados.setdefault("pontuacoes", {})
