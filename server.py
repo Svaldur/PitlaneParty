@@ -204,6 +204,7 @@ async def gerir_jogador(websocket):
                 perfil_envio["email"] = email
                 perfil_envio["equipa"] = "Sem Equipa"
                 perfil_envio["dias_jogo"] = 1
+                perfil_envio["pontos"] = 0
                 await websocket.send(json.dumps({"tipo": "auth_resp", "sucesso": True, "perfil": perfil_envio}))
                 continue
 
