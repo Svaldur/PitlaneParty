@@ -160,7 +160,7 @@ async def gerir_jogador(websocket):
             "id": player_id,
             "chat": CHAT_HISTORICO[-10:],
             "equipas": DB["equipas"],
-            "leaderboards": gerar_leaderboards()
+            "leaderboards": gerar_leaderboards(), "tempos": DB.setdefault("tempos", {"classic": {"voltas": [], "corridas": []}, "monza": {"voltas": [], "corridas": []}, "portimao": {"voltas": [], "corridas": []}})
         }))
 
         async for mensagem in websocket:
@@ -187,6 +187,7 @@ async def gerir_jogador(websocket):
                     "nome": nome,
                     "criado_em": datetime.now().strftime("%Y-%m-%d"),
                     "pitcoins": 150,
+                    "pontos": 0,
                     "cor_fato": "cinza_claro",
                     "cor_calcas": "cinza_escuro",
                     "capacete": "nenhum",
@@ -232,6 +233,7 @@ async def gerir_jogador(websocket):
                 perfil_envio["email"] = email
                 perfil_envio["equipa"] = eq_atual
                 perfil_envio["dias_jogo"] = dias_jogo
+                perfil_envio["pontos"] = conta.get("pontos", DB["pontuacoes"].get(nome, {}).get("anual", 0))
                 await websocket.send(json.dumps({"tipo": "auth_resp", "sucesso": True, "perfil": perfil_envio}))
                 continue
 
@@ -366,7 +368,7 @@ async def gerir_jogador(websocket):
                 "jogadores": JOGADORES,
                 "chat": CHAT_HISTORICO[-8:],
                 "equipas": DB["equipas"],
-                "leaderboards": gerar_leaderboards()
+                "leaderboards": gerar_leaderboards(), "tempos": DB.setdefault("tempos", {"classic": {"voltas": [], "corridas": []}, "monza": {"voltas": [], "corridas": []}, "portimao": {"voltas": [], "corridas": []}})
             }
             await websocket.send(json.dumps(estado))
 
