@@ -3,6 +3,7 @@ import json
 import os
 import hashlib
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from http import HTTPStatus
 import websockets
 
@@ -36,6 +37,8 @@ def carregar_db():
                 dados.setdefault("contas", {})
                 dados.setdefault("equipas", {})
                 dados.setdefault("pontuacoes", {})
+                dados.setdefault("tempos", {"classic": {"voltas": [], "corridas": []}, "monza": {"voltas": [], "corridas": []}, "portimao": {"voltas": [], "corridas": []}})
+                dados.setdefault("reset_meta", {})
                 cur.close()
                 conn.close()
                 print("[DB] Dados carregados do Neon PostgreSQL!")
@@ -92,7 +95,31 @@ def obter_equipa_do_piloto(nome_piloto):
             return eq_nome
     return "Sem Equipa"
 
+
+def verificar_resets_lisboa():
+    agora = datetime.now(ZoneInfo("Europe/Lisbon"))
+    dia_id = agora.strftime("%Y-%m-%d")
+    sem_id = (agora.date()).toordinal() - ((agora.weekday() + 1) % 7)
+    mes_id = agora.strftime("%Y-%m")
+    ano_id = agora.strftime("%Y")
+    meta = DB.setdefault("reset_meta", {"dia": dia_id, "semana": sem_id, "mes": mes_id, "ano": ano_id})
+    alt = False
+    if meta.get("dia") != dia_id:
+        for d in DB["pontuacoes"].values(): d["diaria"] = 0
+        meta["dia"], alt = dia_id, True
+    if meta.get("semana") != sem_id:
+        for d in DB["pontuacoes"].values(): d["semanal"] = 0
+        meta["semana"], alt = sem_id, True
+    if meta.get("mes") != mes_id:
+        for d in DB["pontuacoes"].values(): d["mensal"] = 0
+        meta["mes"], alt = mes_id, True
+    if meta.get("ano") != ano_id:
+        for d in DB["pontuacoes"].values(): d["anual"] = 0
+        meta["ano"], alt = ano_id, True
+    if alt: guardar_db()
+
 def gerar_leaderboards():
+    verificar_resets_lisboa()
     tabelas = {}
     for periodo in ["diaria", "semanal", "mensal", "anual"]:
         lista = []
