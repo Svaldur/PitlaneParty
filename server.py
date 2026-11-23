@@ -3,29 +3,26 @@ import json
 import os
 import hashlib
 from datetime import datetime
-import websockets
 from http import HTTPStatus
+import websockets
+
+DB_FILE = "database_pitlane.json"
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
 try:
     import psycopg2
 except ImportError:
     psycopg2 = None
-DATABASE_URL = os.environ.get("DATABASE_URL")
+
 def _obter_conexao_pg():
     url = DATABASE_URL
     if url and "sslmode=" not in url:
-        sep = chr(38) if chr(63) in url else chr(63)
+        sep = "&" if "?" in url else "?"
         url = f"{url}{sep}sslmode=require"
     return psycopg2.connect(url)
 
-
-DB_FILE = "database_pitlane.json"
-
-def encriptar_senha(senha):
-    salt = "pitlane_party_salt_2026"
-    return hashlib.sha256((senha + salt).encode("utf-8")).hexdigest()
-
 def carregar_db():
-    padrao = {"contas": {}, "equipas": {}, "pontuacoes": {}, "tempos": {"classic": {"voltas": [], "corridas": []}, "monza": {"voltas": [], "corridas": []}, "portimao": {"voltas": [], "corridas": []}}}
+    padrao = {"contas": {}, "equipas": {}, "pontuacoes": {}}
     if DATABASE_URL and psycopg2:
         try:
             conn = _obter_conexao_pg()
@@ -33,21 +30,32 @@ def carregar_db():
             cur.execute("CREATE TABLE IF NOT EXISTS pitlane_store (id INT PRIMARY KEY, dados TEXT)")
             cur.execute("SELECT dados FROM pitlane_store WHERE id = 1")
             row = cur.fetchone()
-            conn.close()
             if row:
-                val = json.loads(next(iter(row)))
-                for k, v in padrao.items(): val.setdefault(k, v)
-                return val
+                val = next(iter(row))
+                dados = val if isinstance(val, dict) else json.loads(val)
+                dados.setdefault("contas", {})
+                dados.setdefault("equipas", {})
+                dados.setdefault("pontuacoes", {})
+                cur.close()
+                conn.close()
+                print("[DB] Dados carregados do Neon PostgreSQL!")
+                return dados
+            else:
+                cur.execute("INSERT INTO pitlane_store (id, dados) VALUES (1, %s) ON CONFLICT (id) DO NOTHING", (json.dumps(padrao),))
+                conn.commit()
+            cur.close()
+            conn.close()
         except Exception as e:
-            print("Erro PG carregar:", e)
+            print("[DB] Erro ao carregar PostgreSQL:", e)
+        return padrao
+
     if os.path.exists(DB_FILE):
-        try:
-            with open(DB_FILE, "r", encoding="utf-8") as f:
-                val = json.load(f)
-                for k, v in padrao.items(): val.setdefault(k, v)
-                return val
-        except Exception:
-            pass
+        with open(DB_FILE, "r", encoding="utf-8") as f:
+            dados = json.load(f)
+            dados.setdefault("contas", {})
+            dados.setdefault("equipas", {})
+            dados.setdefault("pontuacoes", {})
+            return dados
     return padrao
 
 def guardar_db():
@@ -56,16 +64,23 @@ def guardar_db():
             conn = _obter_conexao_pg()
             cur = conn.cursor()
             cur.execute("CREATE TABLE IF NOT EXISTS pitlane_store (id INT PRIMARY KEY, dados TEXT)")
-            cur.execute("INSERT INTO pitlane_store (id, dados) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET dados = EXCLUDED.dados", (json.dumps(DB, ensure_ascii=False),))
+            cur.execute(
+                "INSERT INTO pitlane_store (id, dados) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET dados = EXCLUDED.dados",
+                (json.dumps(DB, ensure_ascii=False),)
+            )
             conn.commit()
+            cur.close()
             conn.close()
+            return
         except Exception as e:
-            print("Erro PG guardar:", e)
-    try:
-        with open(DB_FILE, "w", encoding="utf-8") as f:
-            json.dump(DB, f, indent=2, ensure_ascii=False)
-    except Exception:
-        pass
+            print("[DB] Erro ao guardar no PostgreSQL:", e)
+
+    with open(DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(DB, f, indent=2, ensure_ascii=False)
+
+def encriptar_senha(senha):
+    salt = "pitlane_party_salt_2026"
+    return hashlib.sha256((senha + salt).encode("utf-8")).hexdigest()
 
 DB = carregar_db()
 JOGADORES = {}
@@ -105,11 +120,12 @@ async def gerir_jogador(websocket):
         "y": 0.0,
         "z": 0.0,
         "ry": 0.0,
+        "progresso": 0.0,
         "cor_fato": "cinza_claro",
         "cor_calcas": "cinza_escuro",
         "capacete": "nenhum"
     }
-    print(f"[+] Liga├º├úo recebida: {player_id}")
+    print(f"[+] Ligacao recebida: {player_id}")
 
     try:
         await websocket.send(json.dumps({
@@ -117,7 +133,7 @@ async def gerir_jogador(websocket):
             "id": player_id,
             "chat": CHAT_HISTORICO[-10:],
             "equipas": DB["equipas"],
-            "leaderboards": gerar_leaderboards(), "tempos": DB.get("tempos", {})
+            "leaderboards": gerar_leaderboards()
         }))
 
         async for mensagem in websocket:
@@ -130,13 +146,13 @@ async def gerir_jogador(websocket):
                 nome = dados.get("nome", "").strip()[:16]
 
                 if not email or "@" not in email or len(senha) < 4 or not nome:
-                    await websocket.send(json.dumps({"tipo": "auth_resp", "sucesso": False, "msg": "Preenche e-mail v├ílido, nome e senha (m├¡n. 4 caracteres)."}))
+                    await websocket.send(json.dumps({"tipo": "auth_resp", "sucesso": False, "msg": "Preenche e-mail valido, nome e senha (min. 4 caracteres)."}))
                     continue
                 if email in DB["contas"]:
-                    await websocket.send(json.dumps({"tipo": "auth_resp", "sucesso": False, "msg": "Este e-mail j├í est├í registado!"}))
+                    await websocket.send(json.dumps({"tipo": "auth_resp", "sucesso": False, "msg": "Este e-mail ja esta registado!"}))
                     continue
                 if any(c["nome"].lower() == nome.lower() for c in DB["contas"].values()):
-                    await websocket.send(json.dumps({"tipo": "auth_resp", "sucesso": False, "msg": "Esse nome de piloto j├í est├í em uso!"}))
+                    await websocket.send(json.dumps({"tipo": "auth_resp", "sucesso": False, "msg": "Esse nome de piloto ja esta em uso!"}))
                     continue
 
                 nova_conta = {
@@ -221,13 +237,14 @@ async def gerir_jogador(websocket):
                 continue
 
             elif tipo == "logout":
-                JOGADORES[player_id].update({"autenticado": False, "email": "", "zona": "menu"})
+                                JOGADORES[player_id].update({"autenticado": False, "email": "", "zona": "menu"})
 
             elif tipo == "update":
                 nome_p = dados.get("nome", JOGADORES[player_id]["nome"])
                 eq_atual = obter_equipa_do_piloto(nome_p)
                 if nome_p in DB["pontuacoes"]:
                     DB["pontuacoes"][nome_p]["equipa"] = eq_atual
+
                 JOGADORES[player_id].update({
                     "nome": nome_p,
                     "equipa": eq_atual,
@@ -236,7 +253,7 @@ async def gerir_jogador(websocket):
                     "y": dados["y"],
                     "z": dados["z"],
                     "ry": dados["ry"],
-                    "progresso": dados.get("progresso", 0),
+                    "progresso": dados.get("progresso", 0.0),
                     "cor_fato": dados.get("cor_fato", "cinza_claro"),
                     "cor_calcas": dados.get("cor_calcas", "cinza_escuro"),
                     "capacete": dados.get("capacete", "nenhum")
@@ -272,6 +289,37 @@ async def gerir_jogador(websocket):
                     if len(DB["equipas"][eq_atual]["membros"]) == 0:
                         del DB["equipas"][eq_atual]
                     guardar_db()
+            elif tipo == "convidar_equipa":
+                remetente = dados.get("remetente", "")
+                alvo_nome = dados.get("alvo_nome", "").strip()
+                eq_atual = obter_equipa_do_piloto(remetente)
+                if eq_atual != "Sem Equipa" and len(DB["equipas"][eq_atual]["membros"]) < 5:
+                    for pid_alvo, info_alvo in JOGADORES.items():
+                        if info_alvo.get("nome", "").lower() == alvo_nome.lower() and info_alvo.get("zona") == "paddock":
+                            if obter_equipa_do_piloto(info_alvo["nome"]) == "Sem Equipa":
+                                info_alvo["convite_pendente"] = {"de": remetente, "equipa": eq_atual}
+                            break
+
+            elif tipo == "responder_convite_equipa":
+                nome_p = dados.get("nome", "")
+                aceitar = dados.get("aceitar", False)
+                eq_convite = dados.get("equipa", "")
+                JOGADORES[player_id].pop("convite_pendente", None)
+                if aceitar and eq_convite in DB["equipas"] and obter_equipa_do_piloto(nome_p) == "Sem Equipa":
+                    if len(DB["equipas"][eq_convite]["membros"]) < 5:
+                        DB["equipas"][eq_convite]["membros"].append(nome_p)
+                        guardar_db()
+            elif tipo == "convidar_corrida":
+                remetente = dados.get("remetente", "")
+                alvo_nome = dados.get("alvo_nome", "").strip()
+                cfg = dados.get("cfg", {"pista": "Circuito Clássico", "voltas": 3, "bots": True})
+                for pid_alvo, info_alvo in JOGADORES.items():
+                    if info_alvo.get("nome", "").lower() == alvo_nome.lower() and info_alvo.get("zona") == "paddock":
+                        info_alvo["convite_corrida"] = {"de": remetente, "cfg": cfg}
+                        break
+
+            elif tipo == "responder_convite_corrida":
+                JOGADORES[player_id].pop("convite_corrida", None)
 
             elif tipo == "ganhar_pontos":
                 nome_p = dados.get("nome", "")
@@ -291,22 +339,24 @@ async def gerir_jogador(websocket):
                 "jogadores": JOGADORES,
                 "chat": CHAT_HISTORICO[-8:],
                 "equipas": DB["equipas"],
-                "leaderboards": gerar_leaderboards(), "tempos": DB.get("tempos", {})
+                "leaderboards": gerar_leaderboards()
             }
             await websocket.send(json.dumps(estado))
 
     except websockets.exceptions.ConnectionClosed:
         pass
     finally:
-        print(f"[-] Liga├º├úo encerrada: {player_id}")
+        print(f"[-] Ligacao encerrada: {player_id}")
         JOGADORES.pop(player_id, None)
 
-import os
-# ... (no final do server.py)
+async def health_check(connection, request):
+    if request.headers.get("Upgrade", "").lower() != "websocket":
+        return connection.respond(HTTPStatus.OK, "Pitlane Party 3D Server Online!\n")
+
 async def main():
     porta = int(os.environ.get("PORT", 8765))
     print(f"Servidor Pitlane Party 3D ativo na porta {porta}")
-    async with websockets.serve(gerir_jogador, "0.0.0.0", porta):
+    async with websockets.serve(gerir_jogador, "0.0.0.0", porta, process_request=health_check):
         await asyncio.Future()
 
 if __name__ == "__main__":
