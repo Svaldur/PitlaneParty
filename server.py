@@ -4,6 +4,19 @@ import os
 import hashlib
 from datetime import datetime
 import websockets
+from http import HTTPStatus
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None
+DATABASE_URL = os.environ.get("DATABASE_URL")
+def _obter_conexao_pg():
+    url = DATABASE_URL
+    if url and "sslmode=" not in url:
+        sep = chr(38) if chr(63) in url else chr(63)
+        url = f"{url}{sep}sslmode=require"
+    return psycopg2.connect(url)
+
 
 DB_FILE = "database_pitlane.json"
 
@@ -12,22 +25,47 @@ def encriptar_senha(senha):
     return hashlib.sha256((senha + salt).encode("utf-8")).hexdigest()
 
 def carregar_db():
+    padrao = {"contas": {}, "equipas": {}, "pontuacoes": {}, "tempos": {"classic": {"voltas": [], "corridas": []}, "monza": {"voltas": [], "corridas": []}, "portimao": {"voltas": [], "corridas": []}}}
+    if DATABASE_URL and psycopg2:
+        try:
+            conn = _obter_conexao_pg()
+            cur = conn.cursor()
+            cur.execute("CREATE TABLE IF NOT EXISTS pitlane_store (id INT PRIMARY KEY, dados TEXT)")
+            cur.execute("SELECT dados FROM pitlane_store WHERE id = 1")
+            row = cur.fetchone()
+            conn.close()
+            if row:
+                val = json.loads(row)
+                for k, v in padrao.items(): val.setdefault(k, v)
+                return val
+        except Exception as e:
+            print("Erro PG carregar:", e)
     if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r", encoding="utf-8") as f:
-            dados = json.load(f)
-            dados.setdefault("contas", {})
-            dados.setdefault("equipas", {})
-            dados.setdefault("pontuacoes", {})
-            return dados
-    return {
-        "contas": {},
-        "equipas": {},
-        "pontuacoes": {}
-    }
+        try:
+            with open(DB_FILE, "r", encoding="utf-8") as f:
+                val = json.load(f)
+                for k, v in padrao.items(): val.setdefault(k, v)
+                return val
+        except Exception:
+            pass
+    return padrao
 
 def guardar_db():
-    with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(DB, f, indent=2, ensure_ascii=False)
+    if DATABASE_URL and psycopg2:
+        try:
+            conn = _obter_conexao_pg()
+            cur = conn.cursor()
+            cur.execute("CREATE TABLE IF NOT EXISTS pitlane_store (id INT PRIMARY KEY, dados TEXT)")
+            cur.execute("INSERT INTO pitlane_store (id, dados) VALUES (1, %s) ON CONFLICT (id) DO UPDATE SET dados = EXCLUDED.dados", (json.dumps(DB, ensure_ascii=False),))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print("Erro PG guardar:", e)
+    try:
+        with open(DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(DB, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
 
 DB = carregar_db()
 JOGADORES = {}
@@ -79,7 +117,7 @@ async def gerir_jogador(websocket):
             "id": player_id,
             "chat": CHAT_HISTORICO[-10:],
             "equipas": DB["equipas"],
-            "leaderboards": gerar_leaderboards()
+            "leaderboards": gerar_leaderboards(), "tempos": DB.get("tempos", {})
         }))
 
         async for mensagem in websocket:
@@ -253,7 +291,7 @@ async def gerir_jogador(websocket):
                 "jogadores": JOGADORES,
                 "chat": CHAT_HISTORICO[-8:],
                 "equipas": DB["equipas"],
-                "leaderboards": gerar_leaderboards()
+                "leaderboards": gerar_leaderboards(), "tempos": DB.get("tempos", {})
             }
             await websocket.send(json.dumps(estado))
 
