@@ -150,7 +150,8 @@ async def gerir_jogador(websocket):
         "progresso": 0.0,
         "cor_fato": "cinza_claro",
         "cor_calcas": "cinza_escuro",
-        "capacete": "nenhum"
+        "capacete": "nenhum",
+        "pontos": 0
     }
     print(f"[+] Ligacao recebida: {player_id}")
 
@@ -227,7 +228,8 @@ async def gerir_jogador(websocket):
                     "equipa": eq_atual,
                     "cor_fato": conta["cor_fato"],
                     "cor_calcas": conta["cor_calcas"],
-                    "capacete": conta["capacete"]
+                    "capacete": conta["capacete"],
+                    "pontos": conta.get("pontos", DB["pontuacoes"].get(nome, {}).get("anual", 0))
                 })
                 perfil_envio = {k: v for k, v in conta.items() if k != "senha_hash"}
                 perfil_envio["email"] = email
