@@ -105,16 +105,16 @@ def verificar_resets_lisboa():
     meta = DB.setdefault("reset_meta", {"dia": dia_id, "semana": sem_id, "mes": mes_id, "ano": ano_id})
     alt = False
     if meta.get("dia") != dia_id:
-        for d in DB["pontuacoes"].values(): d["diaria"] = 0
+        for d in DB["pontuacoes"].values(): d["diaria"] = 0; d["voltas_diaria"] = 0
         meta["dia"], alt = dia_id, True
     if meta.get("semana") != sem_id:
-        for d in DB["pontuacoes"].values(): d["semanal"] = 0
+        for d in DB["pontuacoes"].values(): d["semanal"] = 0; d["voltas_semanal"] = 0
         meta["semana"], alt = sem_id, True
     if meta.get("mes") != mes_id:
-        for d in DB["pontuacoes"].values(): d["mensal"] = 0
+        for d in DB["pontuacoes"].values(): d["mensal"] = 0; d["voltas_mensal"] = 0
         meta["mes"], alt = mes_id, True
     if meta.get("ano") != ano_id:
-        for d in DB["pontuacoes"].values(): d["anual"] = 0
+        for d in DB["pontuacoes"].values(): d["anual"] = 0; d["voltas_anual"] = 0; d["voltas"] = 0
         meta["ano"], alt = ano_id, True
     if alt: guardar_db()
 
@@ -130,7 +130,7 @@ def gerar_leaderboards():
             eq_p = obter_equipa_do_piloto(piloto)
             dados["equipa"] = eq_p
             pts_p = dados.get(periodo, 0)
-            vlt_p = dados.get("voltas", 0)
+            vlt_p = dados.get(f"voltas_{periodo}", dados.get("voltas", 0) if periodo == "anual" else 0)
             lista.append({
                 "nome": piloto,
                 "equipa": eq_p,
@@ -411,6 +411,7 @@ async def gerir_jogador(websocket):
                 DB["pontuacoes"][nome_p]["voltas"] += voltas_ganhas
                 for p_chave in ["diaria", "semanal", "mensal", "anual"]:
                     DB["pontuacoes"][nome_p][p_chave] += pts
+                    DB["pontuacoes"][nome_p][f"voltas_{p_chave}"] = DB["pontuacoes"][nome_p].get(f"voltas_{p_chave}", 0) + voltas_ganhas
                 for c_obj in DB.get("contas", {}).values():
                     if c_obj.get("nome") == nome_p:
                         c_obj["pontos"] = c_obj.get("pontos", 0) + pts
