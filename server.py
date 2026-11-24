@@ -123,15 +123,29 @@ def gerar_leaderboards():
     tabelas = {}
     for periodo in ["diaria", "semanal", "mensal", "anual"]:
         lista = []
+        equipas_agg = {}
+        for eq_n in DB.get("equipas", {}).keys():
+            equipas_agg[eq_n] = {"equipa": eq_n, "pontos": 0, "voltas": 0}
         for piloto, dados in DB["pontuacoes"].items():
+            eq_p = obter_equipa_do_piloto(piloto)
+            dados["equipa"] = eq_p
+            pts_p = dados.get(periodo, 0)
+            vlt_p = dados.get("voltas", 0)
             lista.append({
                 "nome": piloto,
-                "equipa": dados.get("equipa", "Sem Equipa"),
-                "pontos": dados.get(periodo, 0),
-                "voltas": dados.get("voltas", 0)
+                "equipa": eq_p,
+                "pontos": pts_p,
+                "voltas": vlt_p
             })
+            if eq_p != "Sem Equipa":
+                equipas_agg.setdefault(eq_p, {"equipa": eq_p, "pontos": 0, "voltas": 0})
+                equipas_agg[eq_p]["pontos"] += pts_p
+                equipas_agg[eq_p]["voltas"] += vlt_p
         lista.sort(key=lambda x: x["pontos"], reverse=True)
         tabelas[periodo] = lista[:10]
+        lista_eq = list(equipas_agg.values())
+        lista_eq.sort(key=lambda x: (x["pontos"], x["voltas"]), reverse=True)
+        tabelas[f"teams_{periodo}"] = lista_eq[:10]
     return tabelas
 
 async def gerir_jogador(websocket):
@@ -341,6 +355,7 @@ async def gerir_jogador(websocket):
                 if aceitar and eq_convite in DB["equipas"] and obter_equipa_do_piloto(nome_p) == "Sem Equipa":
                     if len(DB["equipas"][eq_convite]["membros"]) < 5:
                         DB["equipas"][eq_convite]["membros"].append(nome_p)
+                        JOGADORES[player_id]["equipa"] = eq_convite
                         guardar_db()
             elif tipo == "convidar_corrida":
                 remetente = dados.get("remetente", "")
