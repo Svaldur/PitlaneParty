@@ -37,7 +37,7 @@ def carregar_db():
                 dados.setdefault("contas", {})
                 dados.setdefault("equipas", {})
                 dados.setdefault("pontuacoes", {})
-                dados.setdefault("tempos", {"classic": {"voltas": [], "corridas": []}, "monza": {"voltas": [], "corridas": []}, "portimao": {"voltas": [], "corridas": []}})
+                dados.setdefault("tempos", {"classic": {"voltas": [], "corridas": []}, "monza": {"voltas": [], "corridas": []}, "portimao": {"voltas": [], "corridas": []}, "shanghai": {"voltas": [], "corridas": []}, "spain": {"voltas": [], "corridas": []}, "austria": {"voltas": [], "corridas": []}, "miami": {"voltas": [], "corridas": []}})
                 dados.setdefault("reset_meta", {})
                 cur.close()
                 conn.close()
@@ -175,7 +175,7 @@ async def gerir_jogador(websocket):
             "id": player_id,
             "chat": CHAT_HISTORICO[-10:],
             "equipas": DB["equipas"],
-            "leaderboards": gerar_leaderboards(), "tempos": DB.setdefault("tempos", {"classic": {"voltas": [], "corridas": []}, "monza": {"voltas": [], "corridas": []}, "portimao": {"voltas": [], "corridas": []}})
+            "leaderboards": gerar_leaderboards(), "tempos": DB.setdefault("tempos", {"classic": {"voltas": [], "corridas": []}, "monza": {"voltas": [], "corridas": []}, "portimao": {"voltas": [], "corridas": []}, "shanghai": {"voltas": [], "corridas": []}, "spain": {"voltas": [], "corridas": []}, "austria": {"voltas": [], "corridas": []}, "miami": {"voltas": [], "corridas": []}})
         }))
 
         async for mensagem in websocket:
@@ -373,7 +373,7 @@ async def gerir_jogador(websocket):
                 pista_k, cat_k = dados.get("pista", "classic"), dados.get("categoria", "voltas")
                 nome_p, eq_p = dados.get("nome", "Piloto"), dados.get("equipa", "Sem Equipa")
                 tempo_v, voltas_c = float(dados.get("tempo", 9999.0)), int(dados.get("voltas", 1))
-                t_root = DB.setdefault("tempos", {"classic": {"voltas": [], "corridas": []}, "monza": {"voltas": [], "corridas": []}, "portimao": {"voltas": [], "corridas": []}})
+                t_root = DB.setdefault("tempos", {"classic": {"voltas": [], "corridas": []}, "monza": {"voltas": [], "corridas": []}, "portimao": {"voltas": [], "corridas": []}, "shanghai": {"voltas": [], "corridas": []}, "spain": {"voltas": [], "corridas": []}, "austria": {"voltas": [], "corridas": []}, "miami": {"voltas": [], "corridas": []}})
                 lista_t = t_root.setdefault(pista_k, {"voltas": [], "corridas": []}).setdefault(cat_k, [])
                 ex = next((x for x in lista_t if x["nome"] == nome_p and (cat_k == "voltas" or x.get("voltas", 3) == voltas_c)), None)
                 if ex:
@@ -423,7 +423,7 @@ async def gerir_jogador(websocket):
                 "jogadores": JOGADORES,
                 "chat": CHAT_HISTORICO[-8:],
                 "equipas": DB["equipas"],
-                "leaderboards": gerar_leaderboards(), "tempos": DB.setdefault("tempos", {"classic": {"voltas": [], "corridas": []}, "monza": {"voltas": [], "corridas": []}, "portimao": {"voltas": [], "corridas": []}})
+                "leaderboards": gerar_leaderboards(), "tempos": DB.setdefault("tempos", {"classic": {"voltas": [], "corridas": []}, "monza": {"voltas": [], "corridas": []}, "portimao": {"voltas": [], "corridas": []}, "shanghai": {"voltas": [], "corridas": []}, "spain": {"voltas": [], "corridas": []}, "austria": {"voltas": [], "corridas": []}, "miami": {"voltas": [], "corridas": []}})
             }
             await websocket.send(json.dumps(estado))
 
