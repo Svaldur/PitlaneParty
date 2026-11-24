@@ -347,11 +347,11 @@ async def gerir_jogador(websocket):
                 cfg = dados.get("cfg", {"pista": "Circuito Clássico", "voltas": 3, "bots": True})
                 for pid_alvo, info_alvo in JOGADORES.items():
                     if info_alvo.get("nome", "").lower() == alvo_nome.lower() and info_alvo.get("zona") == "paddock":
-                        info_alvo["convite_corrida"] = {"de": remetente, "cfg": cfg}
+                        info_alvo["convite_corrida_pendente"] = {"de": remetente, "cfg": cfg}
                         break
 
             elif tipo == "responder_convite_corrida":
-                JOGADORES[player_id].pop("convite_corrida", None)
+                JOGADORES[player_id].pop("convite_corrida_pendente", None)
 
             elif tipo == "registar_tempo":
                 pista_k, cat_k = dados.get("pista", "classic"), dados.get("categoria", "voltas")
@@ -371,7 +371,7 @@ async def gerir_jogador(websocket):
             elif tipo == "convidar_amigo":
                 rem, alvo_n = dados.get("de", ""), dados.get("para", "")
                 for pid, info in JOGADORES.items():
-                    if info.get("nome") == alvo_n and info.get("zona") == "paddock":
+                    if info.get("nome", "").strip().lower() == alvo_n.strip().lower() and info.get("zona") == "paddock":
                         info["pedido_amizade"] = rem
                         break
             elif tipo == "responder_amizade":
@@ -395,6 +395,10 @@ async def gerir_jogador(websocket):
                 DB["pontuacoes"][nome_p]["voltas"] += voltas_ganhas
                 for p_chave in ["diaria", "semanal", "mensal", "anual"]:
                     DB["pontuacoes"][nome_p][p_chave] += pts
+                for c_obj in DB.get("contas", {}).values():
+                    if c_obj.get("nome") == nome_p:
+                        c_obj["pontos"] = c_obj.get("pontos", 0) + pts
+                JOGADORES[player_id]["pontos"] = DB["pontuacoes"][nome_p]["anual"]
                 guardar_db()
 
             estado = {
