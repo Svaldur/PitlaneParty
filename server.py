@@ -230,6 +230,7 @@ async def gerir_jogador(websocket):
                     "cor_fato": conta["cor_fato"],
                     "cor_calcas": conta["cor_calcas"],
                     "capacete": conta["capacete"],
+                    "car_body": conta.get("upgrades", {}).get("car_body", "padrao"),
                     "pontos": conta.get("pontos", DB["pontuacoes"].get(nome, {}).get("anual", 0))
                 })
                 perfil_envio = {k: v for k, v in conta.items() if k != "senha_hash"}
