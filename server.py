@@ -303,7 +303,15 @@ async def gerir_jogador(websocket):
                     "progresso": dados.get("progresso", 0.0),
                     "cor_fato": dados.get("cor_fato", "cinza_claro"),
                     "cor_calcas": dados.get("cor_calcas", "cinza_escuro"),
-                    "capacete": dados.get("capacete", "nenhum")
+                    "capacete": dados.get("capacete", "nenhum"),
+                    "cor_sapatos": dados.get("cor_sapatos", "preto"),
+                    "car_body": dados.get("car_body", "padrao"),
+                    "emote": dados.get("emote", ""),
+                    "voltas": dados.get("voltas", 0),
+                    "pista_id": dados.get("pista_id", "livre"),
+                    "lobby_id": dados.get("lobby_id", ""),
+                    "lobby_rest": dados.get("lobby_rest", 0.0),
+                    "sem_timer": dados.get("sem_timer", 0.0)
                 })
 
             elif tipo == "chat":
