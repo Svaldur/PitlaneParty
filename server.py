@@ -29,9 +29,9 @@ def register():
         headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "Content-Type": "application/json", "Prefer": "return=representation"},
         json={"email": email, "password": hash_pw(password)}
     )
+    print("SUPABASE STATUS:", r.status_code, r.text, flush=True)
     if r.status_code in [200, 201]:
         return jsonify({"ok": True})
-    print("SUPABASE ERRO:", r.status_code, r.text, flush=True)
     return jsonify({"ok": False, "error": r.text}), 400
 
 @app.route("/login", methods=["POST"])
