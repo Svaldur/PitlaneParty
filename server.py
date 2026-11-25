@@ -31,7 +31,7 @@ def register():
     )
     if r.status_code in [200, 201]:
         return jsonify({"ok": True})
-    print("SUPABASE ERRO:", r.status_code, r.text)
+    print("SUPABASE ERRO:", r.status_code, r.text, flush=True)
     return jsonify({"ok": False, "error": r.text}), 400
 
 @app.route("/login", methods=["POST"])
