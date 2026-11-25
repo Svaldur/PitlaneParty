@@ -1,3 +1,4 @@
 Flask
 requests
 websockets
+psycopg2-binary
