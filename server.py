@@ -29,8 +29,9 @@ def register():
         json={"email": email, "password": hash_pw(password)}
     )
     if r.status_code in [200, 201]:
-        return jsonify({"ok": True})
-    return jsonify({"ok": False, "error": r.text}), 400
+    return jsonify({"ok": True})
+print("SUPABASE ERRO:", r.status_code, r.text)
+return jsonify({"ok": False, "error": r.text}), 400
 
 @app.route("/login", methods=["POST"])
 def login():
