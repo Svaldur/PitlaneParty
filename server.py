@@ -306,6 +306,7 @@ async def gerir_jogador(websocket):
                     "capacete": dados.get("capacete", "nenhum"),
                     "cor_sapatos": dados.get("cor_sapatos", "preto"),
                     "car_body": dados.get("car_body", "padrao"),
+                    "upgrades": dados.get("upgrades", {}),
                     "emote": dados.get("emote", ""),
                     "voltas": dados.get("voltas", 0),
                     "pista_id": dados.get("pista_id", "livre"),
