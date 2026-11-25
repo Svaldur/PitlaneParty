@@ -18,6 +18,7 @@ def home():
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
+    print("RECEBI:", data, flush=True)
     email = data.get("email", "").lower().strip()
     password = data.get("password", "")
     if not email or not password:
